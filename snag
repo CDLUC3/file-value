@@ -1,0 +1,237 @@
+#!/usr/bin/perl
+
+use 5.006;
+use strict;
+use warnings;
+
+my $VERSION = $File::Value::VERSION;
+
+use Getopt::Long qw(:config bundling_override);
+use Pod::Usage;
+use File::Value;
+
+#foo #!/bin/sh
+#foo #! -*- perl -*-
+#foo eval 'exec perl -x -S $0 ${1+"$@"} ;'
+#foo 	if 0;
+# The above make for portable Perl startup honoring PATH and emacs.  Don't
+# change lightly.  Options may be inserted before "-x".  For background see
+# 'perldoc perlrun' and http://cr.yp.to/slashpackage/studies/findingperl/7 .
+# For development consider:  alias tp='perl -x -Mblib', eg, tp foo t/foo.t
+
+my %opt = (
+	bump		=> 0,
+	force		=> 0,
+	help		=> 0,
+	lshigh		=> 0,
+	lslow		=> 0,
+	man		=> 0,
+	mknext		=> 0,
+	version		=> 0,
+	verbose		=> 0,
+);
+
+# main
+{
+	GetOptions(\%opt,
+		'bump',
+		'force|f',
+		'help|?',
+		'lshigh',
+		'lslow',
+		'man',
+		'mknext',
+		'version',
+		'verbose|v',
+	) or pod2usage(1);
+
+	pod2usage(1)
+		if $opt{help};
+	pod2usage(-exitstatus => 0, -verbose => 2)
+		if $opt{man};
+	print "$VERSION\n" and exit(0)
+		if $opt{version};
+	pod2usage("$0: --mknext cannot be given with --lshigh or --lslow")
+		if ($opt{lshigh} || $opt{lslow}) && $opt{mknext};
+	pod2usage("$0: no file or directory names given")
+		unless @ARGV;
+
+	foreach my $node (@ARGV) {
+
+		my $as_dir = ($node =~ s,/+$,,);	# a dir if ends in '/'
+		my $prnode = $node			# print-friendly name
+			. ($as_dir ? '/' : '');		# has '/' added back
+
+		my ($n, $msg);
+		if ($opt{lshigh} or $opt{lslow}) {
+			# we're only asked to report either or both of
+			# the low version and the high version
+			my @nodes;
+			$node =~ s/\d+$//;
+			if ($opt{lslow}) {
+				($n, $msg) = list_low_version($node);
+				$n == -1 and print(STDERR
+					"$prnode: has no numbered versions\n"),
+					exit 2
+				;
+				push @nodes, $msg;	# got it, $msg is node
+			}
+			if ($opt{lshigh}) {
+				($n, $msg) = list_high_version($node);
+				$n == -1 and print(STDERR
+					"$prnode: has no numbered versions\n"),
+					exit 2
+				;
+				push @nodes, $msg;	# got it, $msg is node
+			}
+			print join(" ",
+				grep { (-d $_ and s,$,/,) or $_ } @nodes),
+				"\n";
+			next;
+			# yyy support "missing" versions ??
+		}
+		elsif ($opt{mknext} or $opt{bump}) {
+			# XXXXX support bump!!
+			# bump means --next, but mv base name to next
+			#  version created; succeed only if basename
+			#  exists before mv (rename) so that race
+			# conditions can be detected (assuming all
+			# parties are using the 'bump' protocol
+			($n, $msg) = snag_version($node, $as_dir,
+				! $opt{force});
+			if ($n == -1) {
+				print STDERR "$prnode: $msg\n";
+				exit 2;
+			}
+			# got it, $msg is the node name
+			print "$msg", ($as_dir ? '/' : ''), "\n";
+			next;
+		}
+		else {				# simple snag
+			if ($opt{force} && -e $node) {
+				-d $node and
+					rmdir($node) || die "$node: $!"
+				or
+					unlink($node) || die "$node: $!"
+				;
+			}
+			$msg = $as_dir ?
+				snag_dir($node) : snag_file($node);
+			if ($msg eq '') {
+				print "$prnode\n";
+				next;
+			}
+			if ($msg eq '1') {
+				print "$prnode already exists";
+				print ", but as a ", ($as_dir ?
+						"file" : "directory")
+					if ($as_dir != -d $node);
+				print "\n";
+				exit 1;
+			}
+			print STDERR "$prnode: $msg\n";
+			exit 2;
+		}
+	}
+	exit 0;
+}
+
+=for roff
+.nr PS 12p
+.nr VS 14.4p
+
+=head1 NAME
+
+snag - reserve or find version-aware file and directory names
+
+=head1 SYNOPSIS
+
+=over
+
+=item B<snag> [B<-fvh>] I<name>[/] ...
+
+=item B<snag> [B<-fvh>] [B<--lshigh | --lslow | --mknext>] I<name>[/] ...
+
+=back
+
+=head1 DESCRIPTION
+
+The B<snag> command creates node I<name> as a file, or as a directory if
+I<name> ends with a '/' character.  It outputs the created node name on
+success and exits with status 0.  Unlike the C<touch(1)> command, B<snag>
+will normally fail if the node exists (exit status 1) before it tries to
+create it.  Other errors result in exit status 2 and a message on stderr.
+If B<-f> (force) is given, an attempt will be made first to remove a
+pre-existing node.
+
+In the presence of B<--lshigh>, B<--lslow>, or B<--mknext>, the node
+I<name> is considered a base for numbered version names that end in
+digits.  In this case, any terminal digits in I<name> ("1" by default if
+there are no terminal digits) are interpreted specially.
+
+If B<--lshigh> ("list high")is given, no node will be created, but the
+highest existing numbered version will be returned, where candidate
+versions will be any node name beginning with base I<name> and ending in
+any string of digits.  Similarly for B<--lslow> ("list low"), but for
+the lowest existing numbered version.
+
+If B<--mknext> is given, an attempt will be made to create the next highest
+numbered version.  If a race condition is detected, several attempts will
+be made.  The next highest version is determined by first finding the
+highest current version number and adding 1 to it.  It is an error if the
+type of the requested version (file or directory) is different from that
+of the current high version unless B<--force> is given.
+
+=head1 EXAMPLES
+
+  $ snag v4/
+  v4/
+  $ echo `for i in a b c; do snag --mknext v001/; done`
+  v005/ v006/ v007/
+  $ snag --lshigh v2
+  v007/
+  $ snag foo
+  foo
+  $ snag --mknext foo.; snag --mknext foo.
+  foo.1
+  foo.2
+
+=head1 OPTIONS
+
+=over
+
+=item B<-h>, B<--help>
+
+Print extended help documentation.
+
+=item B<--man>
+
+Print full documentation.
+
+=item B<--version>
+
+Print the current version number and exit.
+
+=back
+
+=head1 SEE ALSO
+
+touch(1)
+
+=head1 AUTHOR
+
+John Kunze I<jak at ucop dot edu>
+
+=head1 COPYRIGHT
+
+  Copyright 2009 UC Regents.  Open source Apache License, Version 2.
+
+=begin CPAN
+
+=head1 README
+
+=head1 SCRIPT CATEGORIES
+
+=end CPAN
+
+=cut
