@@ -4,5 +4,4 @@ Makefile.PL
 README
 lib/File/Value.pm
 snag
-t/snagtest.t
 VERSION
