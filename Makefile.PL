@@ -18,6 +18,7 @@ WriteMakefile(
     PL_FILES            => {},
     PREREQ_PM => {
         'Getopt::Long'	=> 0,
+        'File::Copy'	=> 0,
         'File::Glob'	=> 0,
         'Pod::Usage'	=> 0,
         'Fcntl'		=> 0,

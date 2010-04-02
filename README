@@ -1,8 +1,8 @@
-The "snag" command (script) creates file and directory names, and comes
-with version-aware features for reporting the highest existing version or
-creating the next higher version.
+The "snag" command (script) creates previously non-existing file and
+directory names, and comes with version-aware features for reporting the
+highest existing version or creating the next higher version.
 
-The File::Value module supports the "snag" and "nam" commands (and
+The File::Value module supports the "snag" and "nam" commands (and the
 File::Namaste module).
 
 INSTALLATION
@@ -38,7 +38,4 @@ You can also look for information at:
 
 COPYRIGHT AND LICENSE
 
-Copyright (C) 2009 UC Regents
-
-This program is released under the following license: Apache2
-
+Copyright 2009-2010 UC Regents.  Open source BSD license.

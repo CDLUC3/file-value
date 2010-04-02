@@ -5,7 +5,7 @@ use warnings;
 use strict;
 
 our $VERSION;
-$VERSION = sprintf "%d.%02d", q$Name: Release-0-17 $ =~ /Release-(\d+)-(\d+)/;
+$VERSION = sprintf "%d.%02d", q$Name: Release-0-20 $ =~ /Release-(\d+)-(\d+)/;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -206,19 +206,34 @@ sub list_low_version { my( $template )=@_;
 	return ($min, $fname);
 }
 
-sub snag_version { my( $template, $as_dir, $no_type_mismatch )=@_;
+sub snag_opt_defaults { return {
+
+	as_dir		 => undef,	# create node as dir (default is to
+					# infer it from argument if possible)
+	no_type_mismatch => 0,		# complain if mismatch (default don't)
+	mknextcopy	 => 0,		# copy unnumbered file (default don't)
+	};
+}
+
+sub snag_version { my( $template, $opt ) = (shift, shift);
 
 	return (-1, "no base name given")	if ! defined $template;
+	$opt ||= snag_opt_defaults();
+	my $as_dir = $opt->{as_dir};	# might be undefined (ok)
 
 	# Carve off terminal digit string $digits ("1" default).
 	my $digits = ($template =~ s/(\d+)$//)
 		? $1 : "1";	
-	my $vfmt = '%0'. length($digits) . 'd';
+	my $vfmt = '%0'. length($digits) . 'd';	# version number format
 
-	$no_type_mismatch ||= 0;	# default this arg to false
+	$opt->{mknextcopy} and -f $template ||	# pre-condition of mknextcopy
+		return (-1, "mknextcopy only works if '$template' is a "
+			. "pre-existing file");
+
+	$opt->{no_type_mismatch} ||= 0;	# default this option to false
 	my ($hnum, $hnode) = list_high_version($template);
 	if ($hnum == -1) {
-		$as_dir ||= 0;		# default node type is "file"
+		$as_dir ||= 0;		# default type here is "file"
 		$hnum = $digits - 1;	# number we'll start trying for
 	}
 	else {				# current high is in $hnode
@@ -228,8 +243,8 @@ sub snag_version { my( $template, $as_dir, $no_type_mismatch )=@_;
 		# is a valid specified value, as for $as_dir below.
 		#
 		if (defined $as_dir) {
-			$no_type_mismatch and	# if intolerant of and if there
-				($isa_dir xor $as_dir) and	# is a mismatch
+			$opt->{no_type_mismatch} and	# if intolerant and 
+				($isa_dir xor $as_dir) and	# a mismatch
 				return (-1, "high version ($hnode" .
 					($isa_dir ? "/" : "") .  ") is a " .
 					($isa_dir ? "directory" : "file") .
@@ -247,10 +262,21 @@ sub snag_version { my( $template, $as_dir, $no_type_mismatch )=@_;
 		$try = $template . sprintf($vfmt, $hnum);
 		$msg = $as_dir ?
 			snag_dir($try) : snag_file($try);
-		return ($hnum, $try)	if ! $msg;	# success
+		last			if ! $msg;	# success
+		#return ($hnum, $try)	if ! $msg;	# success
 		return (-1, $msg)	if $msg ne "1";	# error, not race
 	}
-	return (-1, "gave up after " . MAX_TRIES . " races lost");
+	$msg and return (-1, "gave up after " . MAX_TRIES . " races lost");
+
+	# If we get here, $try contains the node that we snagged.
+	if ($opt->{mknextcopy}) {
+		return (-1, "mknextcopy only works if '$try' is a file")
+			unless -f $try; 	# re-check pre-condition
+		use File::Copy;
+		copy($template, $try) or
+			return (-1, "mknextcopy failed: $!");
+	}
+	return ($hnum, $try);
 }
 
 sub snag_dir { my( $node )=@_;
@@ -286,22 +312,29 @@ File::Value - manipulate file name or content as a single value
 
 =head1 SYNOPSIS
 
- use File::Value;           # to import routines into a Perl script
+ use File::Value;              # to import routines into a Perl script
 
  ($msg = file_value(">pid_file", $pid))  # Example: store a file value
          and die "pid_file: $msg\n";
-  ...
+
  ($msg = file_value("<pid_file", $pid))  # Example: read a file value
          and die "pid_file: $msg\n";
 
  print elide($title, "${displaywidth}m")      # Example: fit long title
         if length($title) > $displaywidth;    # by eliding from middle
 
- list_high_version()            # scroll down in page for docs on these
- list_low_version()
- snag_dir()
- snag_file()
- snag_version()
+ snag_dir($dirname);           # attempt to create directory $dirname
+ snag_file($filename);         # attempt to create file $filename
+
+ ($num, $name) =               # return number and name of node created
+  snag_version(                # with lowest numbered available version
+   $template, {                # base name with possible terminal digits
+   as_dir => undef,            # create as a directory (default file)
+   no_type_mismatch => 0,      # complain if mismatch (default don't)
+   mknextcopy => 0 });         # copy unnumbered file (default don't)
+
+ list_high_version($template); # report highest version found
+ list_low_version($template);  # report lowest version found
 
 =head1 DESCRIPTION
 
@@ -313,17 +346,6 @@ A list of functions that can be exported.  You can delete this section
 if you don't export anything, such as for a purely object-oriented module.
 
 =head1 FUNCTIONS
-
-=head2 elide( $s, $max, $ellipsis )
-
-Take input string $s and return a shorter string with an ellipsis marking
-what was deleted.  The optional $max parameter (default 16) specifies the
-maximum length of the returned string, and may optionally be followed by
-a letter indicating where the deletion should take place:  'e' means the
-end of the string (default), 's' the start of the string, and 'm' the
-middle of the string.  The optional $ellipsis parameter specifies how the
-deleted characters will be represented; it defaults to ".." for 'e' or 's'
-deletion, and to "..." for 'm' deletion.
 
 =head2 file_value( $file, $value, $how, $maxlen )
 
@@ -338,30 +360,58 @@ parameter $maxlen dictates the maximum number of octets that will be
 copied.  It defaults for sanity to 4GB; use a value of 0 (zero) to remove
 even that limit.
 
-=head2 list_high_version( $template )
+=head2 elide( $s, $max, $ellipsis )
 
-Return the number and name of the highest numbered existing version
-of $template (defaults to ""), where numbered versions have the form
-/$template\d+$/, eg, "v" for v001, v02, v3, or "foo.v" for foo.v1, ...,
-foo.v129 .  Return (-1, undef) if no numbered versions exist.
+Take input string $s and return a shorter string with an ellipsis marking
+what was deleted.  The optional $max parameter (default 16) specifies the
+maximum length of the returned string, and may optionally be followed by
+a letter indicating where the deletion should take place:  'e' means the
+end of the string (default), 's' the start of the string, and 'm' the
+middle of the string.  The optional $ellipsis parameter specifies how the
+deleted characters will be represented; it defaults to ".." for 'e' or 's'
+deletion, and to "..." for 'm' deletion.
 
-=head2 list_low_version( $template )
+=head2 snag_file( $filename ), snag_dir( $dirname )
 
-Similar to list_high_version(), but return the number and name of the lowest
-numbered existing version.
+The snag_file() and snag_dir() routines try to create directory or file
+$node.  Return "" on successful creation, "1" if $node already exists,
+else an error message.  We check existence only if the creation attempt
+fails, which permits efficient handling of race conditions.  For example,
 
-=head2 snag_version( $template[, $as_dir[, $no_type_mismatch]] )
+	$msg = -e $node ? "1"		# either branch can return "1"
+		: snag_file($node);	# race lost if this returns "1"
+	if ($msg eq "1") {
+		$fname = snag_version("$node.v1");
+	}
+
+checks existence before calling us, avoiding subroutine and system
+call overhead, and it can rely on the "1" return to detect a lost
+race and take appropriate action.  Generally returns strings, so the
+caller must check with string comparison (ne, eq instead of !=, ==).
+
+=head2 snag_version( $template, $options )
 
 Create the lowest numbered available version of a file or directory that
 is higher than the highest existing version, and return a two-element
 array containing the number and name of the node that was obtained, or
-(-1, $error_msg) on failure.  If no numbered version exists, the version
-that will be created will be a file, or a directory if $as_dir is true
-(default is false).  If $no_type_mismatch is true (default is false), it
-is an error if the type of the highest version (file or directory) is
-different from the requested type.  If a race condition is detected,
-snag_version will try again with the next higher version number, but
-won't do this more than a few times.
+(-1, $error_msg) on failure.  The $options argument is an optional hash
+reference in which the following keys are recognized:
+
+  as_dir           => undef,    # create node as dir (default is to
+                                # infer it from $template if possible)
+  no_type_mismatch => 0,        # complain if mismatch (default don't)
+  mknextcopy       => 0,        # copy unnumbered file (default don't)
+
+If no numbered version exists, the version that will be created will be a
+file, or a directory if C<as_dir> is true (default is false unless the
+original node was a directory).  If C<no_type_mismatch> is true (default
+is false), it is an error if the type of the highest version (file or
+directory) is different from the requested type.  If a race condition is
+detected, snag_version will try again with the next higher version
+number, but won't do this more than a few times.  If C<mknextcopy> is
+true (default false), the new node will receive a copy of the unnumbered
+file corresponding to $template (it is an error if it does not exist
+already as an unnumbered file).
 
 The $template parameter is used to search for and create numbered
 versions.  If it doesn't end in a digit substring ($digits), the digit
@@ -388,23 +438,17 @@ v998 currently exist, running
 
 will then create v999, v1000, v1001, etc.
 
-=head2 snag_file( $filename ), snag_dir( $dirname )
+=head2 list_high_version( $template )
 
-The snag_file() and snag_dir() routines try to create directory or file
-$node.  Return "" on successful creation, "1" if $node already exists,
-else an error message.  We check existence only if the creation attempt
-fails, which permits efficient handling of race conditions.  For example,
+Return the number and name of the highest numbered existing version
+of $template (defaults to ""), where numbered versions have the form
+/$template\d+$/, eg, "v" for v001, v02, v3, or "foo.v" for foo.v1, ...,
+foo.v129 .  Return (-1, undef) if no numbered versions exist.
 
-	$msg = -e $node ? "1"		# either branch can return "1"
-		: snag_file($node);	# race lost if this returns "1"
-	if ($msg eq "1") {
-		$fname = snag_version("$node.v1");
-	}
+=head2 list_low_version( $template )
 
-checks existence before calling us, avoiding subroutine and system
-call overhead, and it can rely on the "1" return to detect a lost
-race and take appropriate action.  Generally returns strings, so the
-caller must check with string comparison (ne, eq instead of !=, ==).
+Similar to list_high_version(), but return the number and name of the lowest
+numbered existing version.
 
 =head1 SEE ALSO
 
@@ -452,4 +496,4 @@ L<http://search.cpan.org/dist/File-Value/>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2009 UC Regents.  Open source Apache License, Version 2.
+Copyright 2009-2010 UC Regents.  Open source BSD license.
