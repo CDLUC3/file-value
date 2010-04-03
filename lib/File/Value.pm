@@ -283,7 +283,7 @@ sub snag_dir { my( $node )=@_;
 
 	return "snag_dir: no directory given"	if ! defined $node;
 	return ""	if mkdir($node);
-	return "1"	if -e $node;	# race condition detector
+	return "1"	if -e $node;	# potential race condition detector
 	return $!;	# else return system error message
 }
 
@@ -296,7 +296,7 @@ sub snag_file { my( $node )=@_;
 		# Return success even if for some reason the close fails.
 		if sysopen(FH, $node, O_CREAT | O_EXCL)
 			&& (close(FH) || 1);
-	return "1"	if -e $node;	# race condition detector
+	return "1"	if -e $node;	# potential race condition detector
 	return $!;	# else return system error message
 }
 
@@ -457,42 +457,6 @@ touch(1)
 =head1 AUTHOR
 
 John A. Kunze, I<jak at ucop.edu>
-
-=head1 BUGS
-
-Please report any bugs or feature requests to
-C<bug-file-value at rt.cpan.org>, or through the web interface at
-L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=File-Value>.  I will be
-notified, and then you'll automatically be notified of progress on your
-bug as I make changes.
-
-=head1 SUPPORT
-
-You can find documentation for this module with the perldoc command.
-
-    perldoc File::Value
-
-You can also look for information at:
-
-=over 4
-
-=item * RT: CPAN's request tracker
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=File-Value>
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/File-Value>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/File-Value>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/File-Value/>
-
-=back
 
 =head1 COPYRIGHT AND LICENSE
 
