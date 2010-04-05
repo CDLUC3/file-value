@@ -195,8 +195,7 @@ the first version number to use if no numbered versions exist.
 
 This second form of the command provides a safe and efficient way to
 capture an unused version.  If a race condition is detected, it will make
-several attempts to safely capture a higher unused version before giving
-up.
+several attempts to capture a higher unused version before giving up.
 
 If B<--lshigh> ("list high") is given, no node will be created, but the
 highest existing numbered version will be returned, where candidate
@@ -224,20 +223,20 @@ already as an unnumbered file.
   $ snag myfile                # fails if it exists
   myfile already exists
   $ cp ~/protostuff myfile     # get new content into myfile
-  $ snag --mknextcopy myfile   # save original as version 1
+  $ snag --mknextcopy myfile   # copy original as version 1
   myfile1
   $ vi myfile                  # make changes to your original
   $ snag --mknextcopy myfile   # save changes as version 2
   myfile2
   $ vi myfile                  # continue making changes
 
-  $ snag v4/                   # create an empty directory
+  $ snag v4/                   # create a numbered directory
   v4/
-  $ snag --mknext v001/        # create next in series: 005
+  $ snag --mknext v001/        # next is 5, but "001" pads to 005
   v005/
-  $ snag --mknext v001/        # use existing series (default 1)
+  $ snag --mknext v001/        # "1" in "001" is first version if none
   v006/
-  $ snag --mknext v001/        # the "001" made v4 pad to v005
+  $ snag --mknext v001/        # but is ignored if versions exist
   v007/
   $ rmdir v006                 # leaving a hole in the series
   $ snag -mknext v005/         # doesn't effect next highest
