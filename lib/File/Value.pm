@@ -10,7 +10,6 @@ $VERSION = sprintf "%d.%02d", q$Name: Release-0-20 $ =~ /Release-(\d+)-(\d+)/;
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
-	elide
 	file_value
 	list_high_version
 	list_low_version
@@ -20,69 +19,6 @@ our @EXPORT = qw(
 );
 our @EXPORT_OK = qw(
 );
-
-# xxx unicode friendly??
-#
-# XXXX test with \n in string???
-my $max_default = 16;		# is there some sense to this? xxx use
-				# xxx fraction of display width maybe?
-
-sub elide { my( $s, $max, $ellipsis )=@_;
-
-	$s	or return undef;
-	$max ||= $max_default;
-	$max !~ /^(\d+)([esmESM]*)([+-]\d+%?)?$/ and
-		return undef;
-	my ($maxlen, $where, $tweak) = ($1, $2, $3);
-
-	$where ||= "e";
-	$where = lc($where);
-
-	$ellipsis ||= ($where eq "m" ? "..." : "..");
-	my $elen = length($ellipsis);
-
-	my ($side, $offset, $percent);		# xxx only used for "m"?
-	if (defined($tweak)) {
-		($side, $offset, $percent) = ($tweak =~ /^([+-])(\d+)(%?)$/);
-	}
-	$side ||= ""; $offset ||= 0; $percent ||= "";
-	# XXXXX finish this! print "side=$side, n=$offset, p=$percent\n";
-
-	my $slen = length($s);
-	return $s
-		if ($slen <= $maxlen);	# doesn't need elision
-
-	my $re;		# we will create a regex to edit the string
-	# length of orig string after that will be left after edit
-	my $left = $maxlen - $elen;
-
-	my $retval = $s;
-	# Example: if $left is 5, then
-	#   if "e" then s/^(.....).*$/$1$ellipsis/
-	#   if "s" then s/^.*(.....)$/$ellipsis$1/
-	#   if "m" then s/^.*(...).*(..)$/$1$ellipsis$2/
-	if ($where eq "m") {
-		# if middle, we split the string
-		my $half = int($left / 2);
-		$half += 1	# bias larger half to front if $left is odd
-			if ($half > $left - $half);	# xxx test
-		$re = "^(" . ("." x $half) . ").*("
-			. ("." x ($left - $half)) . ")\$";
-			# $left - $half might be zero, but this still works
-		$retval =~ s/$re/$1$ellipsis$2/;
-	}
-	else {
-		my $dots = "." x $left;
-		$re = ($where eq "e" ? "^($dots).*\$" : "^.*($dots)\$");
-		if ($where eq "e") {
-			$retval =~ s/$re/$1$ellipsis/;
-		}
-		else {			# else "s"
-			$retval =~ s/$re/$ellipsis$1/;
-		}
-	}
-	return $retval;
-}
 
 # if length is 0, go for it.
 #
@@ -320,9 +256,6 @@ File::Value - manipulate file name or content as a single value
  ($msg = file_value("<pid_file", $pid))  # Example: read a file value
          and die "pid_file: $msg\n";
 
- print elide($title, "${displaywidth}m")      # Example: fit long title
-        if length($title) > $displaywidth;    # by eliding from middle
-
  snag_dir($dirname);           # attempt to create directory $dirname
  snag_file($filename);         # attempt to create file $filename
 
@@ -359,17 +292,6 @@ removes various suspicious characters that might cause security problems
 parameter $maxlen dictates the maximum number of octets that will be
 copied.  It defaults for sanity to 4GB; use a value of 0 (zero) to remove
 even that limit.
-
-=head2 elide( $s, $max, $ellipsis )
-
-Take input string $s and return a shorter string with an ellipsis marking
-what was deleted.  The optional $max parameter (default 16) specifies the
-maximum length of the returned string, and may optionally be followed by
-a letter indicating where the deletion should take place:  'e' means the
-end of the string (default), 's' the start of the string, and 'm' the
-middle of the string.  The optional $ellipsis parameter specifies how the
-deleted characters will be represented; it defaults to ".." for 'e' or 's'
-deletion, and to "..." for 'm' deletion.
 
 =head2 snag_file( $filename ), snag_dir( $dirname )
 
