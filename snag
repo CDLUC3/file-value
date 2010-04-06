@@ -148,6 +148,10 @@ EOI
 	return 1;
 }
 
+__END__
+
+=pod
+
 =for roff
 .nr PS 12p
 .nr VS 14.4p
