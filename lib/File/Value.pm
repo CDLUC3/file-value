@@ -244,7 +244,7 @@ __END__
 
 =head1 NAME
 
-File::Value - manipulate file name or content as a single value
+File::Value - routines to manipulate file name or content as a single value
 
 =head1 SYNOPSIS
 
