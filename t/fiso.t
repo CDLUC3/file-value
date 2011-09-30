@@ -54,56 +54,48 @@ sub filval { my( $file, $value )=@_;	# $file must begin with >, <, or >>
 
 use File::Value ':all';
 
-{	# file_value tests
+{	# fiso tests
 
-remake_td();
-my $x = '   /hi;!echo *; e/fred/foo/pbase        ';
-my $y;
+# 	$base		$last		Returns
+#  1.	/		bar		/bar
+#  2.	.		bar		bar
+#  3.	foo		bar		foo/bar
+#  4.	foo/		bar		foo/bar
+#  5.	foo/bar		bar		foo/bar
+#  6.	bar		bar		bar
+#  7.	""		bar		bar
+#  8.	foo		""		foo
+#
+# xxx may not port to Windows due to use of explicit slashes (/)
+# XXXXXX probably should use File::Spec
+# xxx do some test cases for this
+# xxx was called prep_file in pt script
+# FISO = FIle System Object
+# dname = "down" name (full name with descender, suitable for -X tests)
+# uname = "up" name (upper name without descender, still unique, suitable
+#         for communicating with users)
 
-is file_value(">$td/fvtest", $x, "raw"), "", 'write returns ""';
+is fiso_dname("/", "bar"), "/bar", 'case 1';
+is fiso_dname("//", "bar"), "/bar", 'case 1 extra /';
+is fiso_dname(".", "bar"), "bar", 'case 2';
+is fiso_dname("./", "bar"), "bar", 'case 2 with /';
+is fiso_dname("foo", "bar"), "foo/bar", 'case 3';
+is fiso_dname("foo/", "bar"), "foo/bar", 'case 4';
+is fiso_dname("foo//", "bar"), "foo/bar", 'case 4 extra /';
+is fiso_dname("foo/bar", "bar"), "foo/bar", 'case 5';
+is fiso_dname("foo//bar", "bar"), "foo/bar", 'case 5 extra /';
+is fiso_dname("bar", "bar"), "bar", 'case 6';
+is fiso_dname("/bar", "bar"), "/bar", 'case 6 with initial /';
+is fiso_dname("", "bar"), "bar", 'case 7';
+is fiso_dname("foo", undef), "foo", 'case 8';
 
-is file_value("<$td/fvtest", $y, "raw"), "", 'read returns ""';
+is fiso_uname("/"), "/", 'root alone';
+is fiso_uname("//"), "/", 'root doubled';
+is fiso_uname("foo/bar/"), "foo/", 'dname was a dir';
+is fiso_uname("foo/"), "./", 'dname was short dir';
+is fiso_uname("foo/bar"), "foo/", 'dir with descender';
+is fiso_uname("foo"), "./", 'no dir';
+is fiso_uname(""), "", 'arg is an empty string';
+is fiso_uname(undef), "", 'arg is undefined ';
 
-is $x, $y, 'raw read of what was written';
-
-my $z = (-s "$td/fvtest");
-is $z, length($x), "all bytes written";
-
-file_value("<$td/fvtest", $x);
-is $x, '/hi;!echo *; e/fred/foo/pbase', 'default trim';
-
-file_value("<$td/fvtest", $x, "trim");
-is $x, '/hi;!echo *; e/fred/foo/pbase', 'explicit trim';
-
-file_value("<$td/fvtest", $x, "untaint");
-is $x, 'hi', 'untaint test';
-
-file_value("<$td/fvtest", $x, "trim", 0);
-is $x, '/hi;!echo *; e/fred/foo/pbase', 'trim, unlimited';
-
-file_value("<$td/fvtest", $x, "trim", 12);
-is $x, '/hi;!echo', 'trim, max 12';
-
-file_value("<$td/fvtest", $x, "trim", 12000);
-is $x, '/hi;!echo *; e/fred/foo/pbase', 'trim, max 12000';
-
-like file_value("<$td/fvtest", $x, "foo"), '/must be one of/',
-'error message test';
-
-like file_value("$td/fvtest", $x),
-'/file .*fvtest. must begin.*/', 'force use of >, <, or >>';
-
-# disallowed windows chars: $s =~ tr[<>:"/?*][.]
-is file_value(">$td/Whoa,dude+! Huck Finn", "dummy"), "",
-	'write to weird filename';
-
-file_value(">$td/fvtest", "   foo		\n\n\n");
-file_value("<$td/fvtest", $x, "raw");
-is $x, "foo\n", 'trim on write';
-
-is file_value(">$td/fvtest", "abcdefghij" x 40000), "", 'wrote large file';
-is file_value("<$td/fvtest", $x, "raw"), "", 'read large file';
-is length($x), 400000, 'scaled up to 400Kb value';
-
-remove_td();
 }
