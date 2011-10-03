@@ -20,6 +20,7 @@ WriteMakefile(
         'Getopt::Long'	=> 0,
         'File::Copy'	=> 0,
         'File::Glob'	=> 0,
+        'File::Spec'	=> 0,
         'Pod::Usage'	=> 0,
         'Fcntl'		=> 0,
     },
