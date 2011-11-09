@@ -1,3 +1,14 @@
+# To do: change default behavior and add options:
+#        snag foo -> defaults to:
+#		--mknextcopy for file if it exists, else snag_file
+#		--mknext for dir if it exists, else snag_dir
+#     add options:  --noversion, --dir (default is 'file'), --nocopy
+# Add list of regexs and substitutions for versions, esp. so that
+#  after foo.txt comes foo_1.txt instead of foo.txt_1; order is preference:
+#     qr/[-_]?(\d+)(\.[a-z]*)?$/, etc.
+#  also check for case of foo_\d{4,6} which is a date be prepared to use
+#   today's date for next version
+#
 package File::Value;
 
 use 5.006;
@@ -5,8 +16,7 @@ use warnings;
 use strict;
 
 our $VERSION;
-$VERSION = sprintf "%d.%02d", q$Name: Release-1-01 $ =~ /Release-(\d+)-(\d+)/;
-#$VERSION = sprintf "%s", q$Name: Release-v0.250.0$ =~ /Release-(v\d+\.\d+\.\d+)/;
+$VERSION = sprintf "%d.%02d", q$Name: Release-1-02 $ =~ /Release-(\d+)-(\d+)/;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -144,7 +154,7 @@ use File::Spec;
 our $Win;			# whether we're running on Windows
 defined($Win) or	# if we're on a Windows platform avoid -l
 	$Win = grep(/Win32|OS2/i, @File::Spec::ISA);
-our $B = $Win ? '\\' : '/';	# short name for boundary
+our $B = $Win ? '\\\\' : '/';	# short name for boundary (\) in regexes
 
 # Return the full normalized name of a filesystem-based object that can
 # legitimately be specified either by its enclosing directory name or
@@ -190,20 +200,19 @@ our $B = $Win ? '\\' : '/';	# short name for boundary
 sub fiso_dname { my( $base, $last )=@_;
 
 	return (($base || "") . ($last || ""))
-		unless ($base and $last);		# cases 7-8 gone
+		unless ($base and $last);			# cases 7-8 done
 	$last =~ s{${B}*(.*)${B}*$}{$1}o;	# remove bounding slashes
-	return "${B}$last"		if $base =~ m{^${B}+$}o;	# case 1 eliminated
+	return "${B}$last"	if $base =~ m{^${B}+$}o;	# case 1 done
 	$base =~ s{${B}+$}{}o;		# remove trailing slashes
-	return "$last"		if $base =~ m{^\.${B}*$}o;	# case 2 eliminated
+	return "$last"		if $base =~ m{^\.${B}*$}o;	# case 2 done
 	return "$base${B}$last"	if $base !~ m{$last$};	# cases 3-4 gone
 	return "$last"		if $base =~ m{^$last$};	# case 6 eliminated
-	$base =~ s{${B}*$last$}{};		# remove $last and preceding slashes
-	return "$base${B}$last";				# case 5 eliminated
+	$base =~ s{${B}*$last$}{};	# remove $last and preceding slashes
+	return "$base${B}$last";				# case 5 done
 }
 
 # Return parent of $oname (object name) with trailing slash intact.
 # xxx This needs to work closely with fiso_dname
-# XXXXX make this portable, or does it already work?
 #
 sub fiso_uname { my( $oname )=@_;
 
