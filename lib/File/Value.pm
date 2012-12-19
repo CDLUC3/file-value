@@ -381,6 +381,12 @@ File::Value - routines to manipulate file name or content as a single value
  ($msg = file_value("<pid_file", $pid))  # Example: read a file value
          and die "pid_file: $msg\n";
 
+ ($msg = flvl(">pid_file", $pid))        # quick, raw write of file value
+         and die "pid_file: $msg\n";
+
+ ($msg = flvl("<pid_file", $pid))        # quick, raw read of file value
+         and die "pid_file: $msg\n";
+
  snag_dir($dirname);           # attempt to create directory $dirname
  snag_file($filename);         # attempt to create file $filename
 
@@ -418,6 +424,11 @@ parameter $maxlen dictates the maximum number of octets that will be
 copied.  It defaults for sanity to 4GB; use a value of 0 (zero) to remove
 even that limit.
 
+=head2 flvl( $file, $value )
+
+Often preferable as a faster, rawer variant of file_value().  It can still
+handle large files (any file that can be slurped), but perhaps not huge files.
+
 =head2 snag_file( $filename ), snag_dir( $dirname )
 
 The snag_file() and snag_dir() routines try to create directory or file
@@ -427,9 +438,8 @@ fails, which permits efficient handling of race conditions.  For example,
 
 	$msg = -e $node ? "1"		# either branch can return "1"
 		: snag_file($node);	# race lost if this returns "1"
-	if ($msg eq "1") {
-		$fname = snag_version("$node.v1");
-	}
+	$msg eq "1" and
+		($msg, $fname) = snag_version("$node.v1");
 
 checks existence before calling us, avoiding subroutine and system
 call overhead, and it can rely on the "1" return to detect a lost
